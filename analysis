@@ -92,6 +92,9 @@ Additional information needed:
 
     Packet capture of image capture using 1x1 binning and 2x2 binning
 
+    Set gain to 80 and 0 (or whatever the minimum that OCS allows)
+
+    Does OCS provide temperature?
 
 unknown commands:
     One of these is probably used to distinguish color vs mono

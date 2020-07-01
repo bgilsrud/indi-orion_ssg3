@@ -1,0 +1,23 @@
+Orion StarShoot G3
+=================================
+This package provides the INDI driver for the Orion StarShoot G3 cameras.
+
+Requirements
+============
+* INDI
+* CFITSIO
+* libusb
+
+
+Installation
+============
+See INSTALL
+
+
+How to Use
+==========
+Once installed, the Orion StarShoot G3 INDI driver can be used by an INDI client such as
+KStars (Ekos) or OpenPHD. It can also be used manually by invoking it via the 
+indi_server:
+$ indi_server indi_orion_ssg3_ccd
+
