@@ -1,0 +1,110 @@
+VID:DID is 0722:0502
+
+All commands are done via control packets to EP0 using reserved type requests
+
+Changing gain:
+bmRequestType: 0x60
+bRequest:25
+wValue is:
+    0xc87f (51327) == Orion camera studio gain 200
+    0xb97f (47487) == Orion camera studio gain 185
+wIndex: 2
+wLength: 0
+
+
+Cooling control:
+On?
+bRequest: 22
+wValue: 0x003b
+wIndex: 1
+wLength: 0
+
+Off?
+bRequest: 22
+wValue: 0x003b
+wIndex: 0
+wLength: 0
+
+
+Image capture:
+It appears that OCS sends a stream of commands when an exposure starts
+
+ICX419AK has 795x596 total pixels
+effective 752x582 = 437,664 pixels at 16-bits == 875,328 bytes
+
+    One of these is probably binning
+    bRequest: 13 ???
+        
+    bRequest: 31 ???
+        1 sec dark 
+            wValue: 0x0003
+            wIndex: 0
+            wLength: 0
+    bRequest: 32 ???
+       
+        1s dark:
+            wValue: 0x02f2
+            wIndex: 0
+            wLength: 0
+        1s light:
+            wValue: 0x02f2
+            wIndex: 0
+            wLength: 0
+    bRequest: 33 ???
+        1s dark:
+            wValue: 0x000c
+            wIndex: 0
+            wLength: 0
+        1s light:
+            wValue: 0x000c
+            wIndex: 0
+            wLength: 0
+    bRequest: 34 ???
+        1s dark:
+            wValue: 0x0251
+            wIndex: 0
+            wLength: 0
+        1s light:
+            wValue: 0x0251
+            wIndex: 0
+            wLength: 0
+    
+    bRequest: 16 (probably start exposure)
+        1s light:
+            wValue: 0x03e8
+            wIndex: 0
+            wLength:0
+        wValue: exposure length in msec
+        wIndex: 0
+        wLength: 0
+
+    After exposure is complete, it's downloaded from bulk EP 0x82
+    584 pkts 1568 bytes + 1 1536B packet + 1 96B packet
+             1504 data
+    879,840 bytes downloaded
+
+
+
+
+Additional information needed:
+
+    It would be helpful to get image dimensions from OCS captured frame.
+
+    Packet capture of image capture using 1x1 binning and 2x2 binning
+
+
+unknown commands:
+    One of these is probably used to distinguish color vs mono
+    13 always write
+    20 always read
+    23
+    24
+    25
+    38
+    
+ORION_G3_CMDS = {
+    START_EXPOSURE = 16
+    COOLER = 22,
+    GAIN = 25,
+
+};
