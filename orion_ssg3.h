@@ -25,12 +25,12 @@ struct orion_ssg3 {
     libusb_device_handle *devh;
     uint8_t gain;
     uint8_t offset;
-    uint16_t binning;
-};
-
-enum {
-    SSG3_BINNING_1x1 = 0x0101,
-    SSG3_BINNING_2x2 = 0x0202,
+    uint16_t bin_x;
+    uint16_t bin_y;
+    uint16_t subframe_x1;
+    uint16_t subframe_x2;
+    uint16_t subframe_y1;
+    uint16_t subframe_y2;
 };
 
 int orion_ssg3_open(struct orion_ssg3 &ssg3);
@@ -39,6 +39,6 @@ int orion_ssg3_close(struct orion_ssg3 *ssg3);
 int orion_ssg3_set_cooling(struct orion_ssg3 *ssg3, int on);
 int orion_ssg3_set_gain(struct orion_ssg3 *ssg3, uint8_t gain);
 int orion_ssg3_set_offset(struct orion_ssg3 *ssg3, uint8_t offset);
-int orion_ssg3_set_binning(struct orion_ssg3 *ssg3, uint16_t bin);
+int orion_ssg3_set_binning(struct orion_ssg3 *ssg3, uint8_t x, uint8_t y);
 int orion_ssg3_start_exposure(struct orion_ssg3 *ssg3, uint32_t msec);
 #endif /* ORION_SSG3_H */

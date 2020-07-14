@@ -102,28 +102,11 @@ effective 752x582 = 437,664 pixels at 16-bits == 875,328 bytes
 
 
 
-Additional information needed:
-
-    It would be helpful to get image dimensions from OCS captured frame.
-
-    Packet capture of image capture using 1x1 binning and 2x2 binning
-
-    Set gain to 80 and 0 (or whatever the minimum that OCS allows)
-
-    Does OCS provide temperature?
-
 unknown commands:
     One of these is probably used to distinguish color vs mono
-    13 always write
+    One of these is probably a temperature reading
     20 always read
-    23
-    24
-    25
-    38
-    
-ORION_G3_CMDS = {
-    START_EXPOSURE = 16
-    COOLER = 22,
-    GAIN = 25,
-
-};
+    23 Ambient temp??
+    24 Some sort of status?
+    38 CCD temp??
+    35 Read only, only seen when cooler is on. Status? bit 0 set means no cooler power??

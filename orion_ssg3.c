@@ -1,5 +1,6 @@
 /**
  * Orion StarShoot G3 driver
+ * This code was reverse engineered by inspecting USB traffic.
  *
  * Copyright (c) 2020 Ben Gilsrud (bgilsrud@gmail.com)
  *
@@ -26,9 +27,10 @@
 #define ORION_SSG3_PID 0x0502
 #define ORION_SSG3_INTERFACE_NUM 0
 
+/* These are the defaults that Orion Camera Studio sets */
 #define ORION_SSG3_DEFAULT_OFFSET 127
 #define ORION_SSG3_DEFAULT_GAIN 185
-#define ORION_SSG3_DEFAULT_BINNING SSG3_BINNING_1x1
+#define ORION_SSG3_DEFAULT_BINNING 1
 
 #define ICX419_EFFECTIVE_X_START 3
 #define ICX419_EFFECTIVE_X_COUNT 752
@@ -46,6 +48,14 @@ enum {
     SSG3_CMD_Y_READOUT_END = 34,
 };
 
+static int orion_ssg3_set_gain_offset(struct orion_ssg3 *ssg3, uint8_t gain,
+        uint8_t offset);
+
+/**
+ * Convert libusb error codes to standard errno
+ * @param lu_err: The libusb error code to be translated
+ * @return: The corresponding errno
+ */
 static int libusb_to_errno(int lu_err)
 {
     int rc = ENOTTY;
@@ -116,7 +126,6 @@ int orion_ssg3_open(struct orion_ssg3 *ssg3)
         dev = list[i];
         rc = libusb_get_device_descriptor(dev, &desc);
         if (rc) {
-            /* FIXME: error */
             continue;
         }
         if ((desc.idVendor == ORION_SSG3_VID) &&
@@ -140,7 +149,25 @@ int orion_ssg3_open(struct orion_ssg3 *ssg3)
 		return -libusb_to_errno(rc);
 	}
 
-    /* Set defaults since we don't know how to read them from the cmaera */
+    /* Set defaults since we don't know how to read them from the camera */
+    ssg3->offset = ORION_SSG3_DEFAULT_OFFSET;
+    ssg3->gain = ORION_SSG3_DEFAULT_GAIN;
+    ssg3->bin_x = ORION_SSG3_DEFAULT_BINNING;
+    ssg3->bin_y = ORION_SSG3_DEFAULT_BINNING;
+    ssg3->subframe_x1 = ICX419_EFFECTIVE_X_START;
+    ssg3->subframe_x2 = ICX419_EFFECTIVE_X_START + ICX419_EFFECTIVE_X_COUNT - 1;
+    ssg3->subframe_y1 = ICX419_EFFECTIVE_Y_START;
+    ssg3->subframe_y2 = ICX419_EFFECTIVE_Y_START + ICX419_EFFECTIVE_Y_COUNT - 1;
+
+    rc = orion_ssg3_set_gain_offset(ssg3, ssg3->gain, ssg3->offset);
+    if (rc) {
+        return rc;
+    }
+
+    rc = orion_ssg3_set_binning(ssg3, ssg3->x, ssg3->y);
+    if (rc) {
+        return rc;
+    }
     return 0;
 }
 
@@ -152,6 +179,8 @@ int orion_ssg3_open(struct orion_ssg3 *ssg3)
 int orion_ssg3_close(struct orion_ssg3 *ssg3)
 {
 	int rc;
+
+    libusb_release_interface(ssg3->devh, ORION_SSG3_INTERFACE_NUM);
 	rc = libusb_close(ssg3->devh);
 	if (rc) {
 		return -libusb_to_errno(rc);
@@ -169,7 +198,8 @@ static int orion_ssg3_control_set(struct orion_ssg3 *ssg3, uint16_t cmd, uint16_
     int rc;
     uint8_t bmRequestType;
 
-    bmRequestType = LIBUSB_RECIPIENT_DEVICE | LIBUSB_REQUEST_TYPE_RESERVED | LIBUSB_ENDPOINT_OUT;
+    bmRequestType = LIBUSB_RECIPIENT_DEVICE | LIBUSB_REQUEST_TYPE_RESERVED
+                    | LIBUSB_ENDPOINT_OUT;
     rc = libusb_control_transfer(bmRequestType, cmd, wValue, wIndex, NULL, 0, 10);
 
     if (rc) {
@@ -205,11 +235,8 @@ static int orion_ssg3_control_get(struct orion_ssg3 *ssg3, uint16_t cmd,
 
 int orion_ssg3_set_cooling(struct orion_ssg3 *ssg3, int on)
 {
-    int rc;
-
-    on = on ? 1 : 0;
-
-    return orion_ssg3_control_set(ssg3, SSG3_CMD_COOLER, SSG3_COOLER_WVALUE, on); 
+    return orion_ssg3_control_set(ssg3, SSG3_CMD_COOLER, SSG3_COOLER_WVALUE,
+            on ? 1 : 0);
 }
 
 /**
@@ -232,25 +259,44 @@ static int orion_ssg3_set_gain_offset(struct orion_ssg3 *ssg3, uint8_t gain,
         ssg3->offset = offset;
         ssg3->gain = gain;
     }
+
+    return rc;
 }
 
 int orion_ssg3_set_gain(struct orion_ssg3 *ssg3, uint8_t gain)
 {
-    int rc;
-
     return orion_ssg3_set_gain_offset(ssg3, gain, ssg3->offset);
 }
 
 int orion_ssg3_set_offset(struct orion_ssg3 *ssg3, uint8_t offset)
 {
-    int rc;
-
     return orion_ssg3_set_gain_offset(ssg3, ssg3->gain, offset);
 }
 
-int orion_ssg3_set_binning(struct orion_ssg3 *ssg3, uint16_t bin)
+/**
+ * Set the CCD binning
+ * OCS allows for any combination of 1/2 binning (1x1, 1x2, 2x1, 2x2). I don't
+ * know how the x/y bin is set, but I'm guessing that x is sent in the MSB. It
+ * would be easy to confirm with an additional packet capture.
+ * @param ssg3: The ssg3 structure used to control the camera
+ * @param x: The number of pixels to bin x
+ * @param y: The number of pixels to bin y
+ * @return: 0 on success, -errno otherwise
+ */
+int orion_ssg3_set_binning(struct orion_ssg3 *ssg3, uint8_t x, uint8_t y);
 {
-    return orion_ssg3_control_set(ssg3, SSG3_CMD_BINNING, bin, 0);
+    int rc;
+
+    if (x > 2 || y > 2) {
+        return -EINVAL;
+    }
+    rc = orion_ssg3_control_set(ssg3, SSG3_CMD_BINNING, (x << 8) | y, 0);
+    if (!rc) {
+        ssg3->bin_x = x;
+        ssg3->bin_y = y;
+    }
+
+    return rc;
 }
 
 /**
@@ -263,9 +309,5 @@ int orion_ssg3_set_binning(struct orion_ssg3 *ssg3, uint16_t bin)
  */
 int orion_ssg3_start_exposure(struct orion_ssg3 *ssg3, uint32_t msec)
 {
-    SSG3_CMD_START_X_READOUT_START = 31,
-    SSG3_CMD_START_X_READOUT_END = 32,
-    SSG3_CMD_START_Y_READOUT_START = 33,
-    SSG3_CMD_START_Y_READOUT_END = 34,
     return orion_ssg3_control_set(ssg3, SSG3_CMD_START_EXPOSURE, msec, msec >> 16);
 }
