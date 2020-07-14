@@ -32,25 +32,27 @@ It appears that OCS sends a stream of commands when an exposure starts
 ICX419AK has 795x596 total pixels
 effective 752x582 = 437,664 pixels at 16-bits == 875,328 bytes
 
-    One of these is probably binning
-    bRequest: 13 ???
+    bRequest: 13 - Set binning
+        wValue is 0x0101 for 1x1 binning and 0x0202 for 2x2 binning
         
-    bRequest: 31 ???
-        1 sec dark 
-            wValue: 0x0003
+    bRequest: 31 - Set X readout start
+            wValue: 0x0003 for 1x1 binning
             wIndex: 0
             wLength: 0
-    bRequest: 32 ???
+
+            This command tells the firmware which x position of the horizontal line it should start
+            sending data over the USB. See the image labeled "Optical black position" in the ICX419ALL
+            datasheet to explain this.
+
+    bRequest: 32 - Set X readout end
+            wValue: 0x02f2 for 1x1 binning
+            wIndex: 0
+            wLength: 0
+            This command tells the firmware which x position of the horizontal line it should stop
+            sending data over the USB. See the image labeled "Optical black position" in the ICX419ALL
+            datasheet to explain this.
        
-        1s dark:
-            wValue: 0x02f2
-            wIndex: 0
-            wLength: 0
-        1s light:
-            wValue: 0x02f2
-            wIndex: 0
-            wLength: 0
-    bRequest: 33 ???
+    bRequest: 33 - Set Y readout start
         1s dark:
             wValue: 0x000c
             wIndex: 0
@@ -59,7 +61,7 @@ effective 752x582 = 437,664 pixels at 16-bits == 875,328 bytes
             wValue: 0x000c
             wIndex: 0
             wLength: 0
-    bRequest: 34 ???
+    bRequest: 34 - Set Y readout end
         1s dark:
             wValue: 0x0251
             wIndex: 0
@@ -68,8 +70,22 @@ effective 752x582 = 437,664 pixels at 16-bits == 875,328 bytes
             wValue: 0x0251
             wIndex: 0
             wLength: 0
+
+
+            The firmware might look something like this:
+            for (y = 0; y < num_actual_rows; y++) {
+                for (x = 0; x < num_actual_columns; x++) {
+                    val = shift_out_pixel_from_ccd()
+                    if (x >= x_readout_start && x <= x_readout_end &&
+                        y >= y_readout_start && y <= y_readout_end) {
+                        send_pixel_data_over_usb(val)
+                    } else {
+                        /* Drop pixel data on the floor because we don't care about it */
+                    }
+                }
+            }
     
-    bRequest: 16 (probably start exposure)
+    bRequest: 16 - Start exposure
         1s light:
             wValue: 0x03e8
             wIndex: 0
